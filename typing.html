@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<!--
+/------------------------------------------------------------------------------\
+| Copyright (C) 2012-2013 Leap Motion, Inc. All rights reserved.               |
+| Leap Motion proprietary and confidential. Not for distribution.              |
+| Use subject to the terms of the Leap Motion SDK Agreement available at       |
+| https://developer.leapmotion.com/sdk_agreement, or another agreement         |
+| between Leap Motion and you, your company or other organization.             |
+\------------------------------------------------------------------------------/
+-->
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Leap Motion JavaScript Sample</title>
+
+<style type="text/css">
+#binaryNumber {
+
+  font-size: 60px;
+}
+
+#text {
+  width: 600px;
+  word-wrap: break-word;
+
+}
+</style>
+
+<script src="http://js.leapmotion.com/leap-0.6.0-beta1.js"></script>
+<script>
+// Store frame for motion functions
+var previousFrame = null;
+var paused = false;
+var pauseOnGesture = false;
+
+// Setup Leap loop with frame callback function
+var controllerOptions = {enableGestures: true};
+
+var currentChar = "";
+var currentText = "";
+var squeeze = false;
+
+Leap.loop(controllerOptions, function(frame) {
+  if (paused) {
+    return; // Skip this update
+  }
+
+
+
+  // testing
+  var testDiv = document.getElementById("test");
+
+
+
+
+  // testDiv.innerHTML =  testout;
+
+
+
+
+  var testout = "";
+
+  if (frame.hands.length > 0) {
+
+    for (var i=0;i<frame.hands.length;i++) {
+      var hand = frame.hands[i];
+
+      if (hand.type == "left") {        
+      // left hand squeeze
+        // currentText += currentChar;
+        testout = hand.grabStrength;
+
+        if (hand.grabStrength > 0.5) {
+          if (squeeze == false) {
+            currentText += currentChar;
+          }
+          squeeze = true;
+        } 
+        else {
+          squeeze = false;
+        }
+
+      }
+      else {
+      // binary
+
+        var binaryDiv = document.getElementById("binaryNumber");
+        var number = 0;
+
+        if (frame.pointables.length > 0) {
+          var fingerTypeMap = ["Thumb", "Index", "Middle", "Ring", "Pinky"];
+
+
+          var temp = 0;
+          for (var i = 0; i < frame.pointables.length; i++) {
+            var pointable = frame.pointables[i];
+            // console.log(hand.id + " " + pointable.handId);
+            //if you belong to the right hand
+            if (pointable.handId == hand.id) {
+              temp ++;
+              number += Math.pow(2,pointable.type) * (pointable.extended ? 1 : 0);
+              
+            }
+          }
+
+          // console.log(frame.pointables.length);
+          // console.log (temp);
+
+        }
+        binaryDiv.innerHTML = number + " " + String.fromCharCode(64+number);
+        currentChar = String.fromCharCode(64+number);
+      }
+      
+    }
+    testDiv.innerHTML = testout;
+  }
+
+
+
+
+  //update text
+  var textDiv = document.getElementById("text");
+  textDiv.innerHTML = currentText;
+
+
+
+
+})
+
+function vectorToString(vector, digits) {
+  if (typeof digits === "undefined") {
+    digits = 1;
+  }
+  return "(" + vector[0].toFixed(digits) + ", "
+             + vector[1].toFixed(digits) + ", "
+             + vector[2].toFixed(digits) + ")";
+}
+
+function togglePause() {
+  paused = !paused;
+
+  if (paused) {
+    document.getElementById("pause").innerText = "Resume";
+  } else {
+    document.getElementById("pause").innerText = "Pause";
+  }
+}
+
+
+</script>
+</head>
+<body>
+<div id="main">
+
+  <div id="test">start</div>
+  <button id="pause" onclick="togglePause()">Pause</button>
+  
+  <h3>Ascii</h3>
+  <div id="binaryNumber"></div>
+
+  <h3>Text:</h3>
+  <p id="text"></p>
+  <div style="clear:both;"></div>
+
+  <!-- <h3>Gesture data:</h3> -->
+  <div id="gestureData"></div>
+
+  <!-- <h3>Frame data:</h3> -->
+  <div id="frameData"></div>
+  <div style="clear:both;"></div>
+  <!-- <h3>Hand data:</h3> -->
+  <div id="handData"></div>
+  <div style="clear:both;"></div>
+
+
+</div>
+</body>
+</html>

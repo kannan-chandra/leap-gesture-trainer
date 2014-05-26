@@ -1,0 +1,348 @@
+
+
+
+
+<!DOCTYPE html>
+<!--
+/------------------------------------------------------------------------------\
+| Copyright (C) 2012-2013 Leap Motion, Inc. All rights reserved.               |
+| Leap Motion proprietary and confidential. Not for distribution.              |
+| Use subject to the terms of the Leap Motion SDK Agreement available at       |
+| https://developer.leapmotion.com/sdk_agreement, or another agreement         |
+| between Leap Motion and you, your company or other organization.             |
+\------------------------------------------------------------------------------/
+-->
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<title>Leap Motion JavaScript Sample</title>
+
+<style type="text/css">
+#binaryNumber {
+
+  font-size: 15px;
+}
+
+#text {
+  font-size: 100px;
+  width: 600px;
+  word-wrap: break-word;
+  margin: 0;
+
+}
+
+.big {
+  font-size: 100px;
+  margin: 0;
+}
+
+.symbolGroup {
+  /*width:100px;*/
+  /*top:0;*/
+}
+
+.symbolGroup * {
+  /*width: 90px;*/
+}
+
+.column {
+  /*display: inline-block;*/
+}
+
+button.symbol {
+  width: 100px;
+}
+</style>
+
+<script src="jquery-1.4.2.min.js"></script>
+<script src="brain-0.6.3.js"></script>
+<script src="http://js.leapmotion.com/leap-0.6.0-beta1.js"></script>
+<script>
+// Store frame for motion functions
+var previousFrame = null;
+var paused = false;
+var pauseOnGesture = false;
+
+// Setup Leap loop with frame callback function
+var controllerOptions = {enableGestures: true};
+
+var currentChar = "";
+var currentText = "";
+var squeeze = false;
+
+var currFrame;
+
+Leap.loop(controllerOptions, function(frame) {
+  if (paused) {
+    return; // Skip this update
+  }
+
+  //save frame
+  currFrame = frame;
+  // testing
+  var testDiv = document.getElementById("test");
+
+  var testout = "";
+
+  if (frame.hands.length > 0) {
+
+    for (var i=0;i<frame.hands.length;i++) {
+      var hand = frame.hands[i];
+
+      if (hand.type == "left") {        
+      // left hand squeeze
+        // currentText += currentChar;
+        testout = hand.grabStrength;
+
+        if (hand.grabStrength > 0.5) {
+          if (squeeze == false) {
+            // currentText += currentChar;
+          }
+          squeeze = true;
+        } 
+        else {
+          squeeze = false;
+        }
+
+      }
+      else {
+      // binary
+
+        var binaryDiv = document.getElementById("binaryNumber");
+        var number = 0;
+
+        if (frame.pointables.length > 0) {
+          var fingerTypeMap = ["Thumb", "Index", "Middle", "Ring", "Pinky"];
+
+
+          var temp = 0;
+          for (var i = 0; i < frame.pointables.length; i++) {
+            var pointable = frame.pointables[i];
+            // console.log(hand.id + " " + pointable.handId);
+            //if you belong to the right hand
+            if (pointable.handId == hand.id) {
+              temp ++;
+              number += Math.pow(2,pointable.type) * (pointable.extended ? 1 : 0);
+              
+            }
+          }
+
+          // console.log(frame.pointables.length);
+          // console.log (temp);
+
+        }
+        binaryDiv.innerHTML = number + " " + String.fromCharCode(64+number);
+        currentChar = String.fromCharCode(64+number);
+      }
+      
+    }
+    // testDiv.innerHTML = testout;
+  }
+
+  //update text
+  var textDiv = document.getElementById("text");
+  // textDiv.innerHTML = currentText;
+
+})
+
+
+
+var symbols = [];
+
+
+
+
+function vectorToString(vector, digits) {
+  if (typeof digits === "undefined") {
+    digits = 1;
+  }
+  return "(" + vector[0].toFixed(digits) + ", "
+             + vector[1].toFixed(digits) + ", "
+             + vector[2].toFixed(digits) + ")";
+}
+
+function togglePause() {
+  paused = !paused;
+
+  if (paused) {
+    document.getElementById("pause").innerText = "Resume";
+  } else {
+    document.getElementById("pause").innerText = "Pause";
+  }
+}
+
+var trainingData = [];
+
+function getData() {
+  
+  console.log(currFrame.fingers);
+
+  var frame = currFrame;
+  var tips = [];
+
+  if (frame.fingers.length == 5) {
+    for (var i=0;i<5;i++) {
+      tips.push (frame.fingers[i].tipPosition);
+    }
+  }
+
+  var scale = 500;
+
+  var inputData = [];
+  for (var i=0;i<tips.length;i++) {
+    inputData.push(tips[i][0]/scale);
+    inputData.push(tips[i][1]/scale);
+    inputData.push(tips[i][2]/scale);
+  }
+
+  return inputData;
+}
+
+function saveFrame() {
+
+  tipData = getData();
+
+  if (tipData.length == 0)
+    return;
+
+  var outdata = [];
+  for (var i=0;i<6;i++) {
+    outdata.push(0);
+  }
+  outdata[currNum] = 1;
+
+
+  var result = { input: tipData,
+                 output: outdata};
+  trainingData.push(result);
+
+  console.log(currNum);
+}
+
+
+function findMaxIndex(array) {
+  var currMax = 0;
+  var index = 0;
+  for (var i=0;i<array.length;i++) {
+    if (array[i]>currMax) {
+      currMax = array[i];
+      index = i;
+    }
+  }
+
+  return index;
+}
+
+var net;
+
+function train() {
+  net = new brain.NeuralNetwork();
+  var trainOutput = net.train(this.trainingData, {
+    iterations: 9000,
+    log:true,
+    logPeriod:1000
+  });
+
+  console.log(trainOutput);
+}
+
+function run() {
+
+  tipData = getData();
+
+  if (tipData.length == 0)
+    return;
+
+
+  var output = net.run(tipData);
+
+  console.log(output);
+  console.log(findMaxIndex(output));
+
+  var textDiv = document.getElementById("text");
+  textDiv.innerHTML = symbols[findMaxIndex(output)];
+}
+
+var symbolNum = 0;
+
+function addSymbol() {
+  var btn = document.createElement('button');
+  btn.setAttribute('onclick', 'setCurr(' + symbolNum + ');');
+  symbolNum += 1;
+  btn.setAttribute('class', 'symbol');
+  document.getElementById("btngroup").appendChild(btn);
+
+  var name = document.getElementById("txtNewSymbol").value;
+  btn.innerText = name;
+  symbols.push(name);
+  document.getElementById("txtNewSymbol").value = "";
+}
+
+var currNum = 0;
+
+function setCurr(num) {
+  currNum = num;
+  document.getElementById('currNum').innerHTML = symbols[num];
+}
+
+function searchKeyPress(e)
+{
+  // look for window.event in case event isn't passed in
+  if (typeof e == 'undefined' && window.event) { e = window.event; }
+  if (e.keyCode == 13)
+  {
+    document.getElementById('btnadd').click();
+  }
+}
+
+</script>
+</head>
+<body>
+<div id="main">
+
+  <div id="test">start</div>
+
+  <div class="symbolGroup column">
+    <div id="btngroup" class="buttons">
+    </div>
+    <input id="txtNewSymbol" onkeypress="searchKeyPress(event);"></input>
+    <button id="btnadd" onclick="addSymbol()">+</button>
+  </div>
+
+  <div class="wizard column">
+
+    <!-- <button onclick="startWizard()">Start!</button> -->
+
+    <!-- <button id="pause" onclick="togglePause()">Pause</button> -->
+    <h3>Current Symbol</h3>
+    <div id="currNum" class="big"></div>
+    <button onclick="saveFrame()">Capture</button>
+
+   <!--  <button id="btn0" onclick="saveFrame()">0</button>
+    <button id="btn2" onclick="saveFrame()">1</button>
+    <button id="btn2" onclick="saveFrame()">2</button>
+    <button id="btn2" onclick="saveFrame()">3</button>
+    <button id="btn2" onclick="saveFrame()">4</button>
+    <button id="btn2" onclick="saveFrame()">5</button> -->
+
+    <button id="train" onclick="train()">train</button>
+    <button id="run" onclick="run()">run</button>
+
+    <div id="result"></div>
+
+    <h3>Ascii</h3>
+    <div id="binaryNumber"></div>
+
+    <h3>Symbol:</h3>
+    <p id="text" class="big"></p>
+    <div style="clear:both;"></div>
+
+
+
+
+  </div>
+
+</div>
+</body>
+</html>
+
